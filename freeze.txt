@@ -41,12 +41,6 @@ pydantic_core==2.41.5
 PyGetWindow==0.0.9
 Pygments==2.19.2
 PyMsgBox==2.0.1
-pyobjc-core==12.1
-pyobjc-framework-Cocoa==12.1
-pyobjc-framework-Quartz==12.1
-pyobjc-framework-Security==12.1
-pyobjc-framework-UniformTypeIdentifiers==12.1
-pyobjc-framework-WebKit==12.1
 pyperclip==1.11.0
 PyRect==0.2.0
 PyScreeze==1.0.1
@@ -60,7 +54,6 @@ pywebview==6.1
 PyYAML==6.0.3
 requests==2.32.5
 rich==14.2.0
-rubicon-objc==0.5.3
 selenium==4.39.0
 setuptools==80.9.0
 simple-websocket==1.1.0
