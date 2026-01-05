@@ -1,10 +1,11 @@
 from selenium.webdriver.common.by import By
 from state import States, TurnPhase
 from emulate import emulator
-from watchdog import watchdog
+from Daemons.midas import watchdog
 from sqlite import sqlite
 from config import Config
 from loguru import logger
+from config import Modes
 from kkutu import Kkutu
 import threading
 import time 
@@ -32,6 +33,7 @@ class Midas:
         """In Game Vars"""
         self.turnPhase = TurnPhase.WAIT
         self.suggestedWord = None
+        self.chosenWord = None
 
     def run(self):
         self.driver.get("https://kkutu.io/")
@@ -41,7 +43,7 @@ class Midas:
         self.Watchdog.start_listening()
 
         while self.is_running:
-            time.sleep(0.1)
+            time.sleep(Config.sleepTime)
             event = self.Watchdog.getEvent()
             if event:
                 eventType = event["type"]
@@ -101,13 +103,17 @@ class Midas:
                                 else:
                                     logger.error(f"{suggestedWord} is not a valid or acknowledged word.")
                         except Exception as e:
-                            # logger.error("Probably just an internet lag..")
+                            #logger.error("Probably just an internet lag..")
                             if not Config.killSwitch:
                                 self.turnPhase = TurnPhase.WAIT
-                            time.sleep(0.2)
                             continue
                         self.turnPhase = TurnPhase.ERROR
                     else:
+                        if self.turnPhase == TurnPhase.NO_WORD:
+                            ch = self.cCField.text.strip()
+                            if ch and len(ch) != 1 and not '(' in ch:
+                                Kkutu.markUsed((ch, False))
+                                logger.debug(f"Added {ch} to history just in case this word is not on the database.")
                         self.turnPhase = TurnPhase.SHOULD_TYPE
                 elif (gameStates.turn + 1) % self.playerCount == self.myTurn:
                     if Config.PREDICT:
@@ -115,6 +121,10 @@ class Midas:
                 else:
                     if self.turnPhase == TurnPhase.NO_WORD:
                         logger.info("Somehow my turn was passed even though I couldn't fetch a word.")
+                        ch = self.cCField.text.strip()
+                        if ch:
+                            Kkutu.markUsed((ch, False))
+                            logger.debug(f"Added {ch} to history just in case this word is not on the database.")
                         self.turnPhase = TurnPhase.WAIT
                     elif self.turnPhase == TurnPhase.TYPED:
                         if suggestedWord:
@@ -128,17 +138,18 @@ class Midas:
                     if self.turnPhase == TurnPhase.ERROR:
                         displayedChar = suggestedWord[0]
                     """Check if the prediction was right"""
-                    typedWord = self.inputField.get_attribute("value").strip()
-                    if typedWord:
-                        if typedWord[0] == displayedChar:
-                            logger.success(f"Prediction was correct")
-                            self.Emulator.enter()
-                        else:
-                            self.Emulator.flush(self.inputField)
+                    if Config.MODE != Modes.blatant:
+                        typedWord = self.inputField.get_attribute("value").strip()
+                        if typedWord:
+                            if typedWord[0] == displayedChar:
+                                logger.success(f"Prediction was correct")
+                                self.Emulator.enter()
+                            else:
+                                self.Emulator.flush(self.inputField)
                     """Find word"""
                     suggestedWord = Kkutu.chooseWord(displayedChar, self.roomSettings)
                     if suggestedWord:
-                        if suggestedWord == "pass": # When the animations is playing right after you successfully typed a word. 
+                        if suggestedWord == "pass": # When the animations is playing right after you successfully typed a word.
                             self.turnPhase = TurnPhase.WAIT
                             continue
                         if not Config.killSwitch:

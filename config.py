@@ -1,11 +1,13 @@
-from modes import Modes
+from modes import Modes, Versions
 
 class config:
     PREDICT = False
-    MODE = Modes.blatant
+    MODE = Modes.semiBlatant
     GG = ""
-    getWordLimit = '15'
+    getWordLimit = 15
     maxWordLength = 25
-    killSwitch = False
-    
+    killSwitch = True
+    sleepTime = 0.05
+    VERSION = Versions.Korea
+
 Config = config()

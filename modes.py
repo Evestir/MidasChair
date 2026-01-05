@@ -6,6 +6,10 @@ class Modes(IntEnum):
     semiBlatant = 1
     legit = 2 # """Randomize options"""
 
+class Versions(IntEnum):
+    Korea = 0 
+    Io = 1
+
 @dataclass
 class RoomSettings: 
     ack: bool

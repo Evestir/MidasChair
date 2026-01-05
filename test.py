@@ -1,12 +1,13 @@
-from sqlite import sqlite
+from emulate import emulator
+import ctypes
+import time
 
-Sqlite = sqlite()
+Emulator = emulator()
+user32 = ctypes.windll.user32
 
-words = [("딥지즑", False)]
-
-hanbangWords = ["이리듐"]
-
-
-Sqlite.addTuples(words)
-#Sqlite.deleteWords(words)
-# Sqlite.markHanbang(hanbangWords)
+while True:
+    time.sleep(1)
+    VK_HANGUL = 0x15
+    user32.keybd_event(VK_HANGUL, 0, 0, 0)      # Press
+    time.sleep(0.05)
+    user32.keybd_event(VK_HANGUL, 0, 0x0002, 0) # Release

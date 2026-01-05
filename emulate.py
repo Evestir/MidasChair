@@ -76,15 +76,12 @@ class emulator:
     def flush(self, inputField):
         inputField.click()
         modifier = 'command' if platform.system() == 'Darwin' else 'ctrl'
-        # --- ROUND 1: Clear ---
-        pyautogui.hotkey(modifier, 'a')  # Select All
-        time.sleep(0.05)                 # Wait for highlight
-        pyautogui.hotkey(modifier, 'a')  # Select All
-        pyautogui.press('backspace')     # Delete
+        pyautogui.hotkey(modifier, 'a')
+        time.sleep(0.05)
+        pyautogui.hotkey(modifier, 'a')
+        pyautogui.press('backspace')
 
-        # --- ROUND 2: The "Ghost" Fix ---
-        # We wait 0.1s and do it AGAIN. 
-        # This kills any lagging character that reappears.
+        """To fix ghosting"""
         time.sleep(0.1)
         pyautogui.hotkey(modifier, 'a')
         pyautogui.press('backspace')
@@ -98,3 +95,9 @@ class emulator:
 
     def enter(self):
         pyautogui.press("enter")
+
+    def altTab(self):
+        pyautogui.hotkey('alt', 'tab')
+
+    def hangulkey(self):
+        pyautogui.press("ralt")

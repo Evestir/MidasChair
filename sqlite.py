@@ -40,8 +40,8 @@ class sqlite:
                 for word, ack in words:
                     word = word.strip()
                     cursor.execute(
-                        "INSERT OR IGNORE INTO dictionary (word, length, acknowledged) VALUES (?, ?, ?)", 
-                        (word, len(word), ack)
+                        "INSERT OR IGNORE INTO dictionary (word, length, acknowledged, hanbang) VALUES (?, ?, ?, ?)", 
+                        (word, len(word), ack, False)
                     )
                 conn.commit()
                 logger.success(f"Added {len(words)} words into '{self.db_path}'")
@@ -52,18 +52,17 @@ class sqlite:
         if not tuples: return
         try:
             with sqlite3.connect(self.db_path) as conn:
-                addedWords = []
                 cursor = conn.cursor()
                 for tup in tuples:
                     word = tup[0].strip()
                     cursor.execute(
-                        "INSERT OR IGNORE INTO dictionary (word, length, acknowledged) VALUES (?, ?, ?)", 
-                        (word, len(word), tup[1])
+                        "INSERT OR IGNORE INTO dictionary (word, length, acknowledged, hanbang) VALUES (?, ?, ?, ?)", 
+                        (word, len(word), tup[1], False)
                     )
-                    addedWords.append(word)
                 conn.commit()
-                logger.success(f"Pushed {addedWords[:3]}...({len(addedWords)} words) into '{self.db_path}'")
+                logger.success(f"Pushed {cursor.rowcount} word(s) into '{self.db_path}'")
         except Exception as e:
+            logger.error(e)
             return
     
     def deleteWords(self, words):
@@ -108,9 +107,10 @@ class sqlite:
                     params.append(manner)
                 query += """
                     ORDER BY length DESC
-                    LIMIT 
                 """
-                query += Config.getWordLimit
+                if Config.getWordLimit != 50:
+                    query += """ LIMIT """
+                    query += str(Config.getWordLimit)
                 cursor.execute(query, params)
                 res = cursor.fetchall()
                 if res:
