@@ -11,7 +11,8 @@ if system == "Windows":
 
 class IME:
     def __init__(self):
-        logger.debug(f"System: {system}")
+        #logger.debug(f"System: {system}")
+        pass
 
     def isHangul(self):
         if system == "Windows":

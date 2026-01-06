@@ -27,7 +27,7 @@ class kkutu:
             self.updateUI()
         if not words:
             return None
-        #logger.debug(f"Found {len(words)} Word(s).")
+        logger.debug(f"Found {len(words)} Word(s).")
         suggestedWord = None
         if Config.MODE == Modes.blatant:
             suggestedWord = words[0]

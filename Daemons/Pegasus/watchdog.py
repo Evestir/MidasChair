@@ -45,8 +45,8 @@ def getViewInput(self):
     element = self.driver.find_element(By.CSS_SELECTOR, ".game-input")
     return element
 
-def getInvBtn(self):
-    btn = self.driver.find_element(By.ID, "InviteBtn")
+def getPracticeBtn(self):
+    btn = self.driver.find_element(By.ID, "PracticeBtn")
     return btn
 
 def getRoomSettings(self):
@@ -85,17 +85,17 @@ def getState(self):
             state = States.lobby
             self.replayBtn = elements[0]
     elif self.state == States.lobby:
-        if self.invBtn.is_displayed():
+        if self.practiceBtn.is_displayed():
             state = States.game_lobby
     elif self.state == States.game_lobby:
-        if not self.invBtn.is_displayed():
+        if not self.practiceBtn.is_displayed():
             state = States.pre_game
     elif self.state == States.pre_game:
         placeholder = self.cCField.text
         if placeholder and placeholder != "잠시 후 게임이 시작됩니다!":
             state = States.in_game
     elif self.state == States.in_game or self.state == States.end_screen:
-        if self.invBtn.is_displayed():
+        if self.practiceBtn.is_displayed():
             state = States.lobby
     if state is not self.state:
         logger.debug(f"Game State: {state.name}")
@@ -160,7 +160,7 @@ class Watchdog:
         self.roundElements = None
         self.cCField = None
         self.viewInput = None
-        self.invBtn = None
+        self.practiceBtn = None
         self.roomSettings = None
         """typing mechanisms (states)"""
         self.state = States.title
@@ -199,9 +199,9 @@ class Watchdog:
                     if not self.cCField:
                         with self.lock:
                             self.cCField = self._failSafe(getcCField)
-                    if not self.invBtn:
+                    if not self.practiceBtn:
                         with self.lock:
-                            self.invBtn = self._failSafe(getInvBtn)
+                            self.practiceBtn = self._failSafe(getPracticeBtn)
                     if not self.name:
                         with self.lock:
                             self.name = self._failSafe(getMyName)
@@ -244,7 +244,7 @@ class Watchdog:
 
     def stop_listening(self):
         self.is_running = False
-        logger.info("Watchdog thread stopped.")
+        logger.warning("Bye :)")
 
     def getEvent(self):
         try: 

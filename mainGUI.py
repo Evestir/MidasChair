@@ -1,4 +1,5 @@
 import undetected_chromedriver as uc
+from sharedVariables import shared
 from profiles import Profiles
 from nicegui import ui, app
 from jamo import h2j, j2hcj
@@ -7,11 +8,6 @@ from config import Config
 from loguru import logger
 from kkutu import Kkutu
 from modes import Modes, Versions
-
-midas = None
-pegasus = None
-driver = None
-Sqlite = None
 
 def addWord():
     w = addWordInput.value.strip()
@@ -94,30 +90,34 @@ def renderDelList():
                             ui.item_label("삭제할 단어가 없어요 :D")
 
 async def startUp():
-    global driver, midas, pegasus, Sqlite
-    if driver is not None:
+    if shared.driver is not None:
         return
     logger.debug("Initializing undetected-chromdriver...")
     options = uc.ChromeOptions()
     # options.add_argument('--mute-audio')
-    driver = uc.Chrome(options=options, user_data_dir=Profiles.getPath(), use_subprocess=True)
+    shared.driver = uc.Chrome(options=options, user_data_dir=Profiles.getPath(), use_subprocess=True)
     Sqlite = sqlite()
     if Config.VERSION == Versions.Korea:
         from Daemons.pegasus import Pegasus
-        pegasus = Pegasus(driver)
-        pegasus.start_running()
+        shared.pegasus = Pegasus(shared.driver)
+        shared.pegasus.start_running()
     elif Config.VERSION == Versions.Io:
         from Daemons.midas import Midas
-        midas = Midas(driver)
-        midas.start_running()
-    Kkutu.updateUI = renderWordList.refresh
+        shared.midas = Midas(shared.driver)
+        shared.midas.start_running()
+    Kkutu.updateUI = update
+
+dynamicUIs = [renderWordList, renderDelList, renderHistoryList]
+def update():
+    for func in dynamicUIs:
+        func.refresh()
 
 def cleanUp():
-    if midas:
-        midas.stop_running()
-    elif pegasus:
-        pegasus.stop_running()
-    driver.quit()
+    if shared.midas and shared.midas.is_running:
+        shared.midas.stop_running()
+    elif shared.pegasus and shared.pegasus.is_running:
+        shared.pegasus.stop_running()
+    shared.driver.quit()
 
 ui.timer(0.1, startUp, once=True)
 app.on_shutdown(cleanUp)

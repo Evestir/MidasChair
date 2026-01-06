@@ -186,4 +186,4 @@ class Pegasus:
     def stop_running(self):
         self.Watchdog.stop_listening()
         self.is_running = False
-        logger.info("Pegasus thread stopped.")
+        logger.warning("Bye :)")
