@@ -104,7 +104,7 @@ class Midas:
                                     logger.error(f"{suggestedWord} is not a valid or acknowledged word.")
                         except Exception as e:
                             #logger.error("Probably just an internet lag..")
-                            if not Config.killSwitch:
+                            if Config.autoType:
                                 self.turnPhase = TurnPhase.WAIT
                             continue
                         self.turnPhase = TurnPhase.ERROR
@@ -152,7 +152,7 @@ class Midas:
                         if suggestedWord == "pass": # When the animations is playing right after you successfully typed a word.
                             self.turnPhase = TurnPhase.WAIT
                             continue
-                        if not Config.killSwitch:
+                        if Config.autoType:
                             self.Emulator.type(self.inputField, suggestedWord)
                     else:
                         logger.error(f"No words found for '{displayedChar}'")

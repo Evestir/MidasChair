@@ -90,7 +90,7 @@ class Pegasus:
                                     logger.error(f"{self.suggestedWord} is not a valid or acknowledged word.")
                         except Exception as e:
                             #logger.error("Probably just an internet lag..")
-                            if Config.killSwitch:
+                            if not Config.autoType:
                                 if self.chosenWord:
                                     if Config.MODE == Modes.legit:
                                         self.Emulator.altTab()
@@ -133,7 +133,7 @@ class Pegasus:
                     if Config.MODE != Modes.blatant:
                         typedWord = self.Watchdog.inputField.get_attribute("value").strip()
                         if typedWord:
-                            if not Config.killSwitch:
+                            if Config.autoType:
                                 if typedWord[0] == displayedChar:
                                     logger.success(f"Prediction was correct")
                                     self.Emulator.enter()
@@ -145,13 +145,13 @@ class Pegasus:
                         if self.suggestedWord == "pass": # When the animations is playing right after you successfully typed a word.
                             self.turnPhase = TurnPhase.WAIT
                             continue
-                        if not Config.killSwitch:
+                        if Config.autoType:
                             self.Emulator.type(self.Watchdog.inputField, self.suggestedWord)
                     else:
                         logger.error(f"No words found for '{displayedChar}'")
                         self.turnPhase = TurnPhase.NO_WORD
                         continue
-                    if self.turnPhase == TurnPhase.ERROR and Config.killSwitch:
+                    if self.turnPhase == TurnPhase.ERROR and not Config.autoType:
                         continue
                     self.turnPhase = TurnPhase.TYPED
                 elif self.turnPhase == TurnPhase.SHOULD_PREDICT:

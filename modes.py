@@ -10,6 +10,10 @@ class Versions(IntEnum):
     Korea = 0 
     Io = 1
 
+class WordSelModes(IntEnum):
+    longest = 0
+    random = 1
+
 @dataclass
 class RoomSettings: 
     ack: bool

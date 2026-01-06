@@ -5,5 +5,6 @@ class Shared:
         self.driver = None
         self.midas = None
         self.pegasus = None
+        self.sqlite = None
 
 shared = Shared()

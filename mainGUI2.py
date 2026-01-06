@@ -7,20 +7,20 @@ from sqlite import sqlite
 from config import Config
 from loguru import logger
 from kkutu import Kkutu
-from modes import Modes, Versions
+from modes import Modes, Versions, WordSelModes
 
 def addWord():
     w = addWordInput.value.strip()
     if w:
-        Sqlite.addTuples([(w, isAckSwitch.value)])
+        shared.sqlite.addTuples([(w, isAckSwitch.value)])
     else:
         ui.notify("단어를 먼저 작성해 주세요!")
 
 def typeWord(word):
-    if midas:
-        midas.chosenWord = word
-    elif pegasus:
-        pegasus.chosenWord = word
+    if shared.midas:
+        shared.midas.chosenWord = word
+    elif shared.pegasus:
+        shared.pegasus.chosenWord = word
     """Notify"""
     jam = j2hcj(h2j(word[-1]))
     josa = '를'
@@ -96,7 +96,7 @@ async def startUp():
     options = uc.ChromeOptions()
     # options.add_argument('--mute-audio')
     shared.driver = uc.Chrome(options=options, user_data_dir=Profiles.getSecnPath(), use_subprocess=True)
-    Sqlite = sqlite()
+    shared.sqlite = sqlite()
     if Config.VERSION == Versions.Korea:
         from Daemons.pegasus import Pegasus
         shared.pegasus = Pegasus(shared.driver)
@@ -128,8 +128,9 @@ ui.add_head_html('<link href="https://fonts.googleapis.com/css2?family=Orbit&dis
 ui.query(".nicegui-content").classes("p-0")
 ui.query("body").style("background-color: #39383b")
 ui.dark_mode().enable()
+ui.colors(primary='#ff4d6d')
 
-with ui.splitter(value=18).classes('p-0 w-full h-screen bg-stone-900').style('font-family: "Orbit"') as splitter:
+with ui.splitter(value=18).classes('p-0 w-full h-screen bg-stone-900').style('font-family: "Orbit"').props('separator-class="bg-transparent"') as splitter:
     with splitter.before:
         with ui.tabs().props('vertical').classes('w-full') as tabs:
             midasTab = ui.tab(' ', icon="fas fa-chess-knight")
@@ -146,14 +147,8 @@ with ui.splitter(value=18).classes('p-0 w-full h-screen bg-stone-900').style('fo
                     ui.tab(Modes.legit, label='Legit', icon='fas fa-ghost').classes("flex-1")
                 with ui.column().classes("rounded-lg bg-stone-800 w-full"):
                     with ui.row().classes("w-full items-center justify-between"):
-                        ui.label("KILL SWITCH").classes("pl-4")
-                        ui.switch().bind_value(Config, "killSwitch").props('color="red-8" keep-color icon="shield" unchecked-icon="close" size="xl"')
-                    with ui.row().classes("w-full items-center justify-between"):
-                        ui.label('THREAD SLEEP').classes("pl-4 pb-4 -mt-5")
-                        ui.slider(min=0.01, max=0.2, step=0.01, value=0.05).props("label").classes("w-1/2 pr-4 pb-4 -mt-4").bind_value(Config, "sleepTime")
-                    with ui.row().classes("w-full items-center justify-between"):
-                        ui.label('FETCH AMOUNT').classes("pl-4 pb-4 -mt-5")
-                        ui.slider(min=1, max=50, step=1, value=15).props("label").classes("w-1/2 pr-4 pb-4 -mt-4").bind_value(Config, "getWordLimit")
+                        ui.label("자동 입력").classes("pl-4")
+                        ui.switch().bind_value(Config, "autoType").props('keep-color icon="auto_awesome" unchecked-icon="close" size="xl"')
                 with ui.scroll_area().classes("border-stone-800 bg-stone-800 w-full rounded-lg p-0"):
                     renderWordList()
             with ui.tab_panel(historyTab):
@@ -170,8 +165,20 @@ with ui.splitter(value=18).classes('p-0 w-full h-screen bg-stone-900').style('fo
                         isAckSwitch = ui.switch("어인정").classes("-ml-3")
                         ui.button("추가", on_click=addWord).classes("")
             with ui.tab_panel(settingsTab):
-                ui.label('Settings').classes('text-h4')
-                ui.label('TODO')
+                ui.label('SETTINGS').classes('text-h4')
+                with ui.row().classes("w-full bg-stone-800 rounded-lg p-3"):
+                    ui.item_label('인게임 설정').props('header').classes('text-bold p-0')
+                    with ui.row().classes("w-full items-center justify-between"):
+                        ui.label("단어 선택 방식")
+                        ui.toggle({ WordSelModes.longest: "길이", WordSelModes.random: "무작위" }).bind_value(Config, "wordSelMode").classes("p-0")
+                    with ui.row().classes("w-full items-center justify-between"):
+                        ui.label('단어 색인 개수')
+                        ui.slider(min=1, max=50, step=1, value=15).props("label").bind_value(Config, "getWordLimit").classes("w-1/2 p-0")
+                with ui.row().classes("w-full bg-stone-800 rounded-lg p-3"):
+                    ui.item_label('개발자 설정').props('header').classes('text-bold p-0')
+                    with ui.row().classes("w-full items-center justify-between"):
+                        ui.label('슬립 시간')
+                        ui.slider(min=0.01, max=0.2, step=0.01, value=0.05).props("label").bind_value(Config, "sleepTime").classes("w-1/2 p-0")
 
 if __name__ in {"__main__", "__mp_main__"}:
     ui.run(native=True, title="MidasChair: Standard Edition", window_size=(400, 560), fullscreen=False)

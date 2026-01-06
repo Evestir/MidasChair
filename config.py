@@ -1,4 +1,4 @@
-from modes import Modes, Versions
+from modes import Modes, Versions, WordSelModes
 
 class config:
     PREDICT = False
@@ -6,8 +6,9 @@ class config:
     GG = ""
     getWordLimit = 15
     maxWordLength = 25
-    killSwitch = True
+    autoType = True
     sleepTime = 0.05
     VERSION = Versions.Korea
+    wordSelMode = WordSelModes.random
 
 Config = config()

@@ -1,7 +1,7 @@
 from sqlite import sqlite
 from config import Config
 from loguru import logger
-from modes import Modes
+from modes import Modes, WordSelModes
 import random
 
 class kkutu:
@@ -29,9 +29,9 @@ class kkutu:
             return None
         logger.debug(f"Found {len(words)} Word(s).")
         suggestedWord = None
-        if Config.MODE == Modes.blatant:
+        if Config.wordSelMode == WordSelModes.longest:
             suggestedWord = words[0]
-        elif Config.MODE == Modes.legit or Config.MODE == Modes.semiBlatant:
+        elif Config.wordSelMode == WordSelModes.random:
             suggestions = []
             for word in words:
                 if len(word) <= Config.maxWordLength:
