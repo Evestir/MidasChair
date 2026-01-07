@@ -119,7 +119,7 @@ def getTurn(self):
         class_val = player.get_attribute("class")
         if class_val and "game-user-current" in class_val:
             return i
-    return self.turn
+    return None
 
 def getPlayers(self):
     while True:
@@ -138,6 +138,81 @@ def isEnded(self):
             return True
     return False
 
+def injectTurnHook(self):
+    js_code = """
+    // Global variables for Python
+    window.TURN = -1;
+    window.CURRENT_CHAR = '';
+    window.LAST_SUCCESS_WORD = ''; // <--- NEW: Stores the word just accepted
+    window.LAST_SUCCESS_WORD_FROM = -1
+    
+    if (!window.originalParse) {
+        window.originalParse = JSON.parse;
+    }
+
+    JSON.parse = function(text, reviver) {
+        const data = window.originalParse(text, reviver);
+        
+        try {
+            // 1. Turn Change Packet
+            if (data && typeof data.turn === 'number') {
+                window.TURN = data.turn;
+                if (data.char) window.CURRENT_CHAR = data.char;
+            }
+            
+            // 2. Word Success Packet (The one you asked for)
+            // Pattern: {ok: true, value: '피돌집털벌레', ...}
+            if (data && data.ok === true && typeof data.value === 'string') {
+                window.LAST_SUCCESS_WORD = data.value;
+                window.LAST_SUCCESS_WORD_FROM = window.TURN
+            }
+            
+        } catch (err) { }
+
+        return data;
+    };
+    """
+    self.driver.execute_script(js_code)
+    #logger.success("Packet Observer hooked.")
+
+def injectViewInputObserver(self):
+    js_observer = """
+        window.isMyTurn = false;
+        const target = document.querySelector('.game-input');
+        const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (target.style.display === 'block') {
+            window.isMyTurn = true;
+            } else {
+                window.isMyTurn = false;
+            }
+        });
+        });
+        observer.observe(target, { attributes: true, attributeFilter: ['style'] });
+    """
+    self.driver.execute_script(js_observer)
+    #logger.success("ViewInput Observer hooked.")
+
+def injectSniffer(self):
+    js_code = """
+    // Backup the original JSON.parse
+    if (!window.originalParse) {
+        window.originalParse = JSON.parse;
+    }
+
+    // Overwrite it with our spy function
+    JSON.parse = function(text, reviver) {
+        const data = window.originalParse(text, reviver);
+        
+        // Log EVERYTHING to the console so we can find the turn packet
+        // Look at the Console (F12) while the game is playing!
+        console.log("Packet:", data);
+        
+        return data;
+    };
+    """
+    self.driver.execute_script(js_code)
+
 gameStates = namedtuple('gameStates', ['state', 'turn'])
 
 class Watchdog:
@@ -151,7 +226,8 @@ class Watchdog:
         self.name = ""
         self.inputField = None
         self.replayBtn = None
-
+        """pre_game"""
+        self.hasInjected = False
         """in_game (events)"""
         self.players = []
         self.playerCount = 0
@@ -162,10 +238,12 @@ class Watchdog:
         self.viewInput = None
         self.practiceBtn = None
         self.roomSettings = None
+        self.lastWord = ''
         """typing mechanisms (states)"""
         self.state = States.title
-        self.turn = 0
+        self.turn = None
         self.myTurn = 0
+        self.isMyTurn = False
 
     def _failSafe(self, function, timeout=2.0, interval=0.05):
         start_time = time.time()
@@ -184,9 +262,7 @@ class Watchdog:
         while self.is_running:
             time.sleep(0.05)
             try:
-                state = getState(self)
-                with self.lock:
-                    self.state = state
+                self.state = getState(self)
                 if self.state == States.lobby:
                     if self.players:
                         with self.lock:
@@ -206,6 +282,11 @@ class Watchdog:
                         with self.lock:
                             self.name = self._failSafe(getMyName)
                 elif self.state == States.pre_game:
+                    if not self.hasInjected:
+                        injectViewInputObserver(self)
+                        injectTurnHook(self)
+                        self.hasInjected = True
+                        # injectSniffer(self)
                     if not self.players:
                         with self.lock:
                             self.players = self._failSafe(getPlayers)
@@ -226,9 +307,35 @@ class Watchdog:
                         with self.lock:
                             self.currentRound = currentRound
                         self.event_queue.put({"type": "ROUND_CHANGE"})
-                    with self.lock:
-                        self.turn = getTurn(self)
-            except StaleElementReferenceException:
+                    # Determine if it's my turn
+                    currentTurn = self.driver.execute_script("return window.TURN;")
+                    liveWord = self.driver.execute_script("return window.LAST_SUCCESS_WORD;").strip()
+                    liveWordFrom = self.driver.execute_script("return window.LAST_SUCCESS_WORD_FROM;")
+                    # 2. Handle Turn Change (Standard Logic)
+                    if currentTurn != self.turn:
+                        self.turn = currentTurn
+                        # If the turn changed to someone else, stop typing immediately
+                        if currentTurn != self.myTurn:
+                            with self.lock:
+                                self.isMyTurn = False
+                        elif self.lastWord == '':
+                            logger.debug("Hawk Tuah! Spit on that thang!")
+                            with self.lock:
+                                self.isMyTurn = True
+                    # 3. Handle "Zero Delay" Logic (Pre-calculation)
+                    nextPlayer = (self.turn + 1) % self.playerCount
+                    # If I am the NEXT player...
+                    if self.myTurn == nextPlayer:
+                        # ...and the word has CHANGED since I last processed it
+                        if self.lastWord != liveWord and liveWordFrom == self.turn:
+                            logger.debug(f"Opponent finished word: {liveWord}")
+                            with self.lock:
+                                # A. Update my memory so I don't process this word twice
+                                self.lastWord = liveWord
+                                # B. Trigger the bot to start calculating/typing NOW
+                                # (Even though self.turn isn't me yet, we prepare)
+                                self.isMyTurn = True
+            except StaleElementReferenceException as e:
                 pass
             except Exception as e:
                 logger.error(e)
@@ -252,8 +359,5 @@ class Watchdog:
         except queue.Empty:
             return
         
-    def isMyTurn(self):
-        displayed = self.viewInput.is_displayed()
-        if displayed:
-            return True
-        return False
+    def fIsMyTurn(self):
+        return self.driver.execute_script("return window.isMyTurn;")

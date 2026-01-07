@@ -31,3 +31,4 @@ while True:
         elif pegasus:
             pegasus.stop_running()
         driver.quit()
+        break

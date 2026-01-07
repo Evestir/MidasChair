@@ -2,9 +2,9 @@ from modes import Modes, Versions, WordSelModes
 
 class config:
     PREDICT = False
-    MODE = Modes.semiBlatant
+    MODE = Modes.blatant
     GG = ""
-    getWordLimit = 15
+    getWordLimit = 25
     maxWordLength = 25
     autoType = True
     sleepTime = 0.05

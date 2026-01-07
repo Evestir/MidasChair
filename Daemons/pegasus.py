@@ -43,6 +43,7 @@ class Pegasus:
                     logger.debug(f"Round Changed: {self.Watchdog.currentRound + 1}")
                     Kkutu.updateDatabase()
                     Kkutu.reset()
+                    self.Watchdog.lastWord = ''
                     self.turnPhase = TurnPhase.WAIT
                 elif eventType == "GAME_ENDED":
                     logger.warning("Gamed Ended")
@@ -57,19 +58,55 @@ class Pegasus:
                         except Exception as e:
                             pass
                         self.Emulator.type(self.inputField, Config.GG)
-
             if self.Watchdog.state == States.lobby:
                 Kkutu.reset()
             elif self.Watchdog.state == States.in_game:
-                """Timing Issue Fix"""
-                if not self.Watchdog.players:
-                    continue
-                """Checking if it's my turn and if the last attempt was a failure"""
-                if self.Watchdog.isMyTurn():
-                    if self.turnPhase == TurnPhase.TYPED and (self.suggestedWord or self.chosenWord) or self.turnPhase == TurnPhase.ERROR: # Unnecessary () however... 
-                        try:
-                            if self.turnPhase == TurnPhase.ERROR:
-                                raise ValueError("Intentional Error")
+                if self.Watchdog.isMyTurn:
+                    if self.turnPhase == TurnPhase.SHOULD_TYPE:
+                        if not self.Watchdog.lastWord:
+                            char = self.Watchdog.cCField.get_attribute("textContent").replace('\n', '').strip()[0]
+                        else:
+                            char = self.Watchdog.lastWord[-1]
+                        # Finding words...
+                        self.suggestedWord = Kkutu.chooseWord(char, self.Watchdog.roomSettings)
+                        if self.suggestedWord:
+                            if Config.autoType:
+                                self.Emulator.type(self.Watchdog.inputField, self.suggestedWord, enter=False)
+                                while not self.Watchdog.fIsMyTurn(): # Milisec precision?
+                                    time.sleep(0.0001)
+                                self.Emulator.enter(self.Watchdog.inputField)
+                            else:
+                                while self.Watchdog.isMyTurn:
+                                    if not self.Watchdog.fIsMyTurn():
+                                        if self.Watchdog.turn is not None:
+                                            nextPlayer = (self.Watchdog.turn + 1) % self.Watchdog.playerCount
+                                            if self.Watchdog.myTurn == nextPlayer:
+                                                pass
+                                            else:
+                                                break
+                                    time.sleep(0.1)
+                                    if self.chosenWord:
+                                        if Config.MODE == Modes.legit:
+                                            self.Emulator.altTab()
+                                            time.sleep(0.3)
+                                            self.IME.forceHangul()
+                                        self.Emulator.type(self.Watchdog.inputField, self.chosenWord)
+                                        break
+                            self.turnPhase = TurnPhase.TYPED
+                        else:
+                            logger.error(f"No words starting with '{char}'")
+                            self.turnPhase = TurnPhase.NO_WORD
+
+                    elif self.turnPhase == TurnPhase.TYPED:
+                        if not self.Watchdog.fIsMyTurn(): # Checking if the last word got passed...
+                            with self.Watchdog.lock:
+                                self.Watchdog.isMyTurn = False
+                                self.Watchdog.lastWord = self.suggestedWord
+                            self.suggestedWord = None
+                            self.chosenWord = None
+                            self.turnPhase = TurnPhase.WAIT
+                            logger.success("Passed my turn")
+                        try: # If my turn was not passed:
                             element = self.Watchdog.cCField.find_element(By.CSS_SELECTOR, ".game-fail-text")
                             text = element.get_attribute("textContent").strip()
                             if "한방 단어:" in text:
@@ -88,93 +125,28 @@ class Pegasus:
                                     logger.error(f"{self.suggestedWord} is not a valid word.")
                                 else:
                                     logger.error(f"{self.suggestedWord} is not a valid or acknowledged word.")
+                            self.turnPhase = TurnPhase.SHOULD_TYPE
                         except Exception as e:
-                            #logger.error("Probably just an internet lag..")
-                            if not Config.autoType:
-                                if self.chosenWord:
-                                    if Config.MODE == Modes.legit:
-                                        self.Emulator.altTab()
-                                        time.sleep(0.3)
-                                        self.IME.forceHangul()
-                                    self.Emulator.type(self.Watchdog.inputField, self.chosenWord)
-                                    self.turnPhase = TurnPhase.TYPED
-                            else:
-                                self.turnPhase = TurnPhase.WAIT
+                            # When internet is too slow to quickly hide the viewInput element
+                            self.turnPhase = TurnPhase.WAIT
                             continue
-                        self.turnPhase = TurnPhase.ERROR
                     elif self.turnPhase == TurnPhase.NO_WORD:
                         pass
                     else:
                         self.turnPhase = TurnPhase.SHOULD_TYPE
-                elif (self.Watchdog.turn + 1) % self.Watchdog.playerCount == self.Watchdog.myTurn:
-                    if Config.PREDICT:
-                        self.turnPhase = TurnPhase.SHOULD_PREDICT
+
                 else:
                     if self.turnPhase == TurnPhase.NO_WORD:
-                        logger.info("The last round was ended...")
                         displayedWord = self.Watchdog.cCField.text.strip()
-                        if displayedWord:
+                        if displayedWord and len(displayedWord) > 1:
                             Kkutu.markUsed((displayedWord, False))
                             logger.debug(f"Added {displayedWord} to history just in case this word is not on the database.")
-                        self.turnPhase = TurnPhase.WAIT
                     elif self.turnPhase == TurnPhase.TYPED:
                         if self.suggestedWord or self.chosenWord:
                             logger.success(f"Confirmed that my turn was passed.")
-                        self.turnPhase = TurnPhase.WAIT
-                        self.suggestedWord = None
-                        self.chosenWord = None
-                    
-                """Typing begins here"""
-                if self.turnPhase == TurnPhase.SHOULD_TYPE or self.turnPhase == TurnPhase.ERROR:
-                    displayedChar = self.Watchdog.cCField.text.strip()
-                    if self.turnPhase == TurnPhase.ERROR:
-                        displayedChar = self.suggestedWord[0]
-                    """Check if the prediction was right"""
-                    if Config.MODE != Modes.blatant:
-                        typedWord = self.Watchdog.inputField.get_attribute("value").strip()
-                        if typedWord:
-                            if Config.autoType:
-                                if typedWord[0] == displayedChar:
-                                    logger.success(f"Prediction was correct")
-                                    self.Emulator.enter()
-                                else:
-                                    self.Emulator.flush(self.Watchdog.inputField)
-                    """Find word"""
-                    self.suggestedWord = Kkutu.chooseWord(displayedChar, self.Watchdog.roomSettings)
-                    if self.suggestedWord:
-                        if self.suggestedWord == "pass": # When the animations is playing right after you successfully typed a word.
-                            self.turnPhase = TurnPhase.WAIT
-                            continue
-                        if Config.autoType:
-                            self.Emulator.type(self.Watchdog.inputField, self.suggestedWord)
-                    else:
-                        logger.error(f"No words found for '{displayedChar}'")
-                        self.turnPhase = TurnPhase.NO_WORD
-                        continue
-                    if self.turnPhase == TurnPhase.ERROR and not Config.autoType:
-                        continue
-                    self.turnPhase = TurnPhase.TYPED
-                elif self.turnPhase == TurnPhase.SHOULD_PREDICT:
-                    """Check if something is already typed"""
-                    if self.Watchdog.inputField.get_attribute("value"):
-                        continue
-                    """For Blatant Opponents"""
-                    displayedChar = self.Watchdog.cCField.text.strip()
-                    predictedWord = Kkutu.chooseWord(displayedChar, self.Watchdog.roomSettings)
-                    if not predictedWord:
-                        logger.error(f"No words found for '{displayedChar}'")
-                        self.turnPhase = TurnPhase.NO_WORD
-                        continue
-                    logger.debug(f"Predicted: {predictedWord}")
-                    self.suggestedWord = Kkutu.chooseWord(predictedWord[-1], self.Watchdog.roomSettings)
-                    if not self.suggestedWord:
-                        logger.error(f"No words found for '{predictedWord[-1]}'")
-                        self.turnPhase = TurnPhase.NO_WORD
-                        continue
-                    if self.suggestedWord == "pass":
-                        self.turnPhase = TurnPhase.WAIT
-                        continue
-                    self.Emulator.type(self.Watchdog.inputField, self.suggestedWord, enter = False)
+                    self.suggestedWord = None
+                    self.chosenWord = None
+                    self.turnPhase = TurnPhase.WAIT
     def start_running(self):
         if not self.is_running:
             t = threading.Thread(target=self.run)

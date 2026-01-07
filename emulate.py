@@ -93,8 +93,8 @@ class emulator:
         except Exception as e:
             logger.error(f"Failed to escape: {e}")
 
-    def enter(self):
-        pyautogui.press("enter")
+    def enter(self, inputField):
+        inputField.send_keys(Keys.RETURN)
 
     def altTab(self):
         pyautogui.hotkey('alt', 'tab')
